@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "local-devops-assistant": {
+      "command": "/Users/shaikyasin/Documents/AI/projects/Omni Route/local-devops-mcp/.venv/bin/python3",
+      "args": [
+        "/Users/shaikyasin/Documents/AI/projects/Omni Route/local-devops-mcp/server.py"
+      ]
+    }
+  }
+}
