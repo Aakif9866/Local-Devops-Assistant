@@ -112,6 +112,18 @@ def main():
         assert "error" in bad, bad
         print("[ok] inspect_container on unknown container -> returns error, not crash")
 
+        empty_name = call("inspect_container", {"container_name": ""})
+        assert "error" in empty_name, empty_name
+        print("[ok] inspect_container with empty container_name -> validated, not crash")
+
+        bad_port = call("check_port", {"port": 99999, "host": "localhost"})
+        assert "error" in bad_port, bad_port
+        print("[ok] check_port with out-of-range port -> validated, not crash")
+
+        bad_tail = call("get_container_logs", {"container_name": "devops-test-nginx", "tail": -5})
+        assert "error" in bad_tail, bad_tail
+        print("[ok] get_container_logs with negative tail -> validated, not crash")
+
         print("\nALL SMOKE TESTS PASSED")
     finally:
         proc.terminate()
