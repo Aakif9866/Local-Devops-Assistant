@@ -37,3 +37,67 @@ def list_containers_impl() -> list[dict]:
             }
         )
     return containers
+
+
+def get_container_logs_impl(container_name: str, tail: int = 100) -> dict:
+    """Return the last `tail` lines of a container's logs."""
+    result = _run_docker(["logs", "--tail", str(tail), container_name])
+    if result.returncode != 0:
+        return {"error": result.stderr.strip() or f"could not get logs for {container_name}"}
+    return {"container": container_name, "tail": tail, "logs": result.stdout.strip()}
+
+
+_SENSITIVE_ENV_PATTERNS = ("PASSWORD", "SECRET", "TOKEN", "KEY", "CREDENTIAL", "PWD")
+
+
+def _filter_env(env_list: list[str]) -> list[str]:
+    """Mask values of environment variables whose name looks sensitive."""
+    filtered = []
+    for entry in env_list:
+        key = entry.split("=", 1)[0]
+        if any(pattern in key.upper() for pattern in _SENSITIVE_ENV_PATTERNS):
+            filtered.append(f"{key}=***REDACTED***")
+        else:
+            filtered.append(entry)
+    return filtered
+
+
+def inspect_container_impl(container_name: str) -> dict:
+    """Return config, health, network info, restart count, and exit code for a container."""
+    result = _run_docker(["inspect", container_name])
+    if result.returncode != 0:
+        return {"error": result.stderr.strip() or f"container '{container_name}' not found"}
+
+    data = json.loads(result.stdout)[0]
+    state = data.get("State", {})
+    config = data.get("Config", {})
+    health = state.get("Health", {})
+
+    return {
+        "name": data.get("Name", "").lstrip("/"),
+        "image": config.get("Image"),
+        "env": _filter_env(config.get("Env", []) or []),
+        "status": state.get("Status"),
+        "health": health.get("Status", "no healthcheck configured"),
+        "exit_code": state.get("ExitCode"),
+        "restart_count": data.get("RestartCount"),
+        "networks": list((data.get("NetworkSettings", {}).get("Networks", {}) or {}).keys()),
+    }
+
+
+def check_docker_health_impl() -> dict:
+    """Check whether the Docker daemon is available and responding."""
+    result = _run_docker(["info", "--format", "{{json .}}"], timeout=5)
+    if result.returncode != 0:
+        return {
+            "healthy": False,
+            "error": result.stderr.strip() or "Docker daemon is not responding",
+        }
+    info = json.loads(result.stdout)
+    return {
+        "healthy": True,
+        "server_version": info.get("ServerVersion"),
+        "containers_running": info.get("ContainersRunning"),
+        "containers_total": info.get("Containers"),
+        "images": info.get("Images"),
+    }
